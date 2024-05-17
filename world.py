@@ -96,7 +96,7 @@ def main():
     # enable manual control for testing
     env = SymbolicObsWrapper(env)
     env = NoDeath(env, no_death_types=("lava",), death_cost=-0.4)
-    manual_control = ManualControl(env, seed=42, demo_file_name="demo1.txt")
+    manual_control = ManualControl(env, seed=42, demo_file_name="optimal.txt")
     manual_control.start()
 
     
