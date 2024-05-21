@@ -17,6 +17,7 @@ import gymnasium as gym
 import pygame
 from minigrid.wrappers import SymbolicObsWrapper
 from minigrid.wrappers import NoDeath
+from minigrid.wrappers import ViewSizeWrapper
 class SimpleEnv(MiniGridEnv):
     def __init__(
         self,
@@ -96,7 +97,7 @@ def main():
     # enable manual control for testing
     env = SymbolicObsWrapper(env)
     env = NoDeath(env, no_death_types=("lava",), death_cost=-0.4)
-    manual_control = ManualControl(env, seed=42, demo_file_name="optimal.txt")
+    manual_control = ManualControl(env, seed=42, demo_file_name="near_optimal_pose.txt")
     manual_control.start()
 
     

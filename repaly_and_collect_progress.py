@@ -3,7 +3,7 @@ from __future__ import annotations
 from minigrid.core.constants import COLOR_NAMES
 from minigrid.core.grid import Grid
 from minigrid.core.mission import MissionSpace
-from minigrid.core.world_object import Door, Goal, Key, Wall
+from minigrid.core.world_object import Door, Goal, Key, Wall, Lava
 from minigrid.manual_control import ManualControl
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.wrappers import RGBImgObsWrapper
@@ -54,11 +54,15 @@ class SimpleEnv(MiniGridEnv):
         # Generate vertical separation wall
         for i in range(0, height):
             self.grid.set(5, i, Wall())
-        
         # Place the door and key
         self.grid.set(5, 6, Door(COLOR_NAMES[0], is_locked=True))
         self.grid.set(3, 6, Key(COLOR_NAMES[0]))
-
+        self.grid.set(2, 6, Lava())
+        self.grid.set(2, 5, Lava())
+        self.grid.set(3, 1, Lava())
+        self.grid.set(4, 1, Lava())
+        self.grid.set(3, 4, Lava())
+        self.grid.set(7, 7, Lava())
         # Place a goal square in the bottom-right corner
         self.put_obj(Goal(), width - 2, height - 2)
 
@@ -102,30 +106,41 @@ def main():
     env.reset()
     progress = []
     delta_progress = [] 
-    file_name = "demo.txt"
-    actions, obss = read_actions_from_file(file_name)
+    rewards = []
+    file_name = "near_optimal_pose"
+    actions, obss = read_actions_from_file(file_name + ".txt")
     env.render()
     time.sleep(3)
     for action in actions:
         print(action, key_to_action[action])
-        env.step(action=key_to_action[action])
+        obs,reward, done, _, _ = env.step(action=key_to_action[action])
         env.render()
         time.sleep(0.5) 
         # get progress via keyboard input
-        inp = int(input("Enter progress: "))
+        inp = (input("Enter progress: "))
+        if inp == '':
+            inp = 0
+        inp = int(inp)
         
         progress.append(int(inp))
-        delta_progress.append(progress[-1] - progress[len(progress) - 2])
+        #delta_progress.append(progress[-1] - progress[len(progress) - 2])
+        rewards.append(reward)
+        with open(file = file_name + "annotated" + ".txt", mode= "w") as f:
+            for i in range (len(progress)):
+                for i in obss[i]:
+                    f.write(str(i) + " ")
+                f.write("\n")
+                f.write(str(actions[i]) + "\n")
+                f.write(str(rewards[i]) + "\n")
+                f.write(str(progress[i]) + "\n")
+                #f.write(str(delta_progress[i]) + "\n")
+        f.close()
+        if done:
+            env.reset()
         
     print(progress)
     print(delta_progress)
-    with open(file = file_name, mode= "w") as f:
-        for i in range (len(actions)):
-            f.write(str(obss[i]) + "\n")
-            f.write(str(actions[i]) + "\n")
-            f.write(str(progress[i]) + "\n")
-            f.write(str(delta_progress[i]) + "\n")
-        f.close()
+
 
     # print(actions)
     # print(obss[0])
