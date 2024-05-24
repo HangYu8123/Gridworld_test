@@ -158,7 +158,7 @@ def main():
     progress = []
     delta_progress = [] 
     rewards = []
-    file_name = "near_optimal_pose"
+    file_name = "non_optimal_pose"
     states, actions, next_states = read_actions_from_file(file_name + ".txt")
 
     auto = True

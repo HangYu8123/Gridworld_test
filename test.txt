@@ -1,0 +1,54 @@
+1 1 0 0 0 
+Actions.forward
+2 1 0 0 0 
+2 1 0 0 0 
+Actions.right
+2 1 1 0 0 
+2 1 1 0 0 
+Actions.forward
+2 2 1 0 0 
+2 2 1 0 0 
+Actions.forward
+2 3 1 0 0 
+2 3 1 0 0 
+Actions.left
+2 3 0 0 0 
+2 3 0 0 0 
+Actions.forward
+3 3 0 0 0 
+3 3 0 0 0 
+Actions.forward
+4 3 0 0 0 
+4 3 0 0 0 
+Actions.right
+4 3 1 0 0 
+4 3 1 0 0 
+Actions.forward
+4 4 1 0 0 
+4 4 1 0 0 
+Actions.forward
+4 5 1 0 0 
+4 5 1 0 0 
+Actions.forward
+4 6 1 0 0 
+4 6 1 0 0 
+Actions.left
+4 6 0 0 0 
+4 6 0 0 0 
+Actions.left
+4 6 3 0 0 
+4 6 3 0 0 
+Actions.left
+4 6 2 0 0 
+4 6 2 0 0 
+Actions.pickup
+4 6 2 1 0 
+4 6 2 1 0 
+Actions.right
+4 6 3 1 0 
+4 6 3 1 0 
+Actions.right
+4 6 0 1 0 
+4 6 0 1 0 
+Actions.toggle
+4 6 0 1 1 
