@@ -96,33 +96,9 @@ key_to_action = {
     "drop": Actions.drop,
 } 
 
-def convert_to_array( data):
-# Initialize an empty array of shape (10, 10, 1)
-    shape = data.shape
-    array = np.zeros((shape[0], shape[1]))
-
-    # Fill the array with the values from the data
-    for row in data:
-        for col in row:
-            i, j, value = col
-            array[i, j] = value
-    return array.flatten()
-def convert_to_pose(data):
-# Initialize an empty array of shape (10, 10, 1)
-    shape = data.shape
-    array = np.zeros((shape[0], shape[1]))
-
-    # Fill the array with the values from the data
-    for row in data:
-        for col in row:
-            i, j, value = col
-            if value == 10:
-                return [i, j]
-
-    return None
 def train():
     ######### Hyperparameters #########
-    file_path = "near_optimal_poseannotated.txt"
+    file_path = "near_optimal_pose_auto_annotated.txt"
     #env_name = "LunarLanderContinuous-v2"
     solved_reward = 0.2        # stop training if solved_reward > avg_reward
     random_seed = 0
@@ -130,8 +106,9 @@ def train():
     n_eval_episodes = 200        # evaluate average reward over n episodes
     lr = 0.0002                 # learing rate
     betas = (0.5, 0.999)        # betas for adam optimizer
-    n_epochs = 10000              # number of epochs
+    n_epochs = 10000             # number of epochs
     n_iter = 100                # updates per epoch
+    n_test = 100                # run test n_test times
     batch_size = 1            # num of transitions sampled from expert
     ###################################
 
@@ -150,44 +127,78 @@ def train():
     rewards = []
     env.reset()
 
-    agent = Q_Learning_agnet.QLAgent(action_space= 7)
-    expert_traj = utils.ExpertTraj(file_path, online=False)
-
+    reward_agent = Q_Learning_agnet.QLAgent(action_space= 7)
+    progress_agent = Q_Learning_agnet.QLAgent(action_space= 7)
+    imitator = Q_Learning_agnet.QLAgent(action_space= 7)
+    expert_traj = utils.ExpertTraj(file_path, reward = True, progress = True)
     for epoch in range(n_epochs):
-        state, next_state, action, reward, progress = expert_traj.sample(batch_size, return_next_state=True)
-        state = state[0]
-        next_state = next_state[0]
-        #convert np.list back to list
-        state = state.tolist()
-        next_state = next_state.tolist()
-       
-        for i in range(3):
-            state[i] = int(state[i])
-            next_state[i] = int(next_state[i])
-        #print("state", state)
-        agent.learning(action[0][0], list(state), list(next_state), progress[0])
-        #print("state", state)
-    agent.epsilon = 0
-    for i in range(100):
-        state = env.reset()
-        state, reward, done, _, _ = env.step(6)
-        state = convert_to_pose(state['image']) + [state['direction']]
-        done = False
-        total_reward = 0
-        cnt = 0
-        while not done and cnt < 200:
-            cnt += 1
-            action = agent.choose_action(state)
-            #print("state", state)   
-            next_state, reward, done, _, _ = env.step(action)
-            total_reward += reward
-            state = next_state
-            state = convert_to_pose(state['image']) + [state['direction']]
-        print("total_reward", total_reward)
-        rewards.append(total_reward)
-        epochs.append(i)
-    plt.plot(epochs, rewards)
+        state, action, next_state, reward, progress = expert_traj.sample(batch_size, reward = True, progress = True )
+        #print(state, action, next_state, reward, progress)
+        reward_agent.learning(state, action, next_state, reward)
+        progress_agent.learning(state, action, next_state, progress)
+        imitator.learning(state, action, next_state, 1)
+
+    # for _ in range(n_test):
+    #     env.reset()
+    #     state = list(env.agent_pos) + [env.agent_dir] + [0 if env.carrying is None else 1] + [1 if env.grid.get(5,6).is_open else 0]
+    #     #print("state", state)
+    #     done = False
+    #     total_reward = 0
+    #     cnt = 0
+    #     while not done and cnt< 40:
+    #         #print("#####################problme is at cnt = ", cnt, "#####################  ")
+    #         #print("#######state##########", state)
+    #         #action = reward_agent.choose_action(state)
+    #         action = imitator.choose_action(state)
+    #         #action = progress_agent.choose_action(state)
+    #         #print("#######action##########", action)
+    #         _, reward, done, _, _ = env.step(action)
+    #         next_state = list(env.agent_pos) + [env.agent_dir] + [0 if env.carrying is None else 1] + [1 if env.grid.get(5,6).is_open else 0]
+    #         #print("#######next_state##########", next_state)
+    #         total_reward += reward
+    #         state = next_state
+    #         cnt += 1
+    #     print("reward", total_reward)
+    #     rewards.append(total_reward)
+    #     epochs.append(epoch)
+    # print("rewards", rewards)
+    # plt.plot([i for i in range(len(rewards))], rewards)
+    # plt.show()
+    reward = []
+
+    for i in range(1, 9):
+        reward.append([])
+        for j in range(1, 9):
+            max_value = -100
+            for k in range(0, 7):
+                for l in range(0, 2):
+                    for m in range(0, 2):
+                        # reward_agent.check_add([i, j, k, l, m])
+                        # max_value = max(max_value, reward_agent.qtable.loc[reward_agent.trans([i, j, k, l, m])].max())
+                        # progress_agent.check_add([i, j, k, l, m])
+                        # max_value = max(max_value, progress_agent.qtable.loc[progress_agent.trans([i, j, k, l, m])].max())
+                        imitator.check_add([i, j, k, l, m])
+                        max_value = max(max_value, imitator.qtable.loc[imitator.trans([i, j, k, l, m])].max())
+            reward[-1].append(max_value)
+    print(reward)
+    import numpy as np
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    data = np.array(reward).transpose()
+
+
+    # Normalize the data
+    data_min = np.min(data)
+    data_max = np.max(data)
+    normalized_data = (data - data_min) / (data_max - data_min)
+    # normalized_data = np.rot90(normalized_data)
+    # normalized_data = np.rot90(normalized_data)
+    # normalized_data = np.rot90(normalized_data)
+    # Plot heatmap
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(normalized_data, cmap='viridis', annot=True)
+    plt.title('Normalized Data Heatmap')
     plt.show()
-    print("Training done")
+
 if __name__ == "__main__":
     train()

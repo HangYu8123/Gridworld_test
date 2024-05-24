@@ -11,8 +11,46 @@ from minigrid.wrappers import OneHotPartialObsWrapper
 from minigrid.wrappers import FullyObsWrapper
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FlatObsWrapper
+import numpy as np
 from minigrid.core.actions import Actions
+import gymnasium as gym
+import pygame
+from minigrid.wrappers import SymbolicObsWrapper
+from minigrid.wrappers import NoDeath
+from minigrid.wrappers import ViewSizeWrapper
 import time
+
+key_to_action = {
+    "forward": Actions.forward,
+    "left": Actions.left,
+    "right": Actions.right,
+    "toggle": Actions.toggle,
+    "pickup": Actions.pickup,
+    "drop": Actions.drop,
+    "done": Actions.done,
+}
+
+def read_actions_from_file( file_path: str, reward = False, progress = False):
+
+    states = []
+    next_states = []
+    actions = []
+    with open(file_path, "r") as f:
+        cnt = 0
+        for line in f:
+            
+            if cnt == 0:
+                states.append(list(map(int, line.strip().split())))
+            elif cnt == 1:
+                actions.append(key_to_action[line.strip().split('.')[1]])
+            elif cnt == 2:
+                next_states.append(list(map(int, line.strip().split())))
+            cnt+=1
+            if cnt == 3:
+                cnt = 0
+
+            
+    return states, actions, next_states
 
 class SimpleEnv(MiniGridEnv):
     def __init__(
@@ -75,71 +113,116 @@ class SimpleEnv(MiniGridEnv):
 
         self.mission = "grand mission"
 
-def read_actions_from_file(file_path: str) -> list[str]:
+global lava_cnt
 
-    observations = []
-    actions = []
+def if_lava(state):
+    if state[0] == 2 and state[1] == 6:
+        return True
+    if state[0] == 2 and state[1] == 5:
+        return True
+    if state[0] == 3 and state[1] == 1:
+        return True
+    if state[0] == 4 and state[1] == 1:
+        return True
+    if state[0] == 3 and state[1] == 4:
+        return True
+    if state[0] == 7 and state[1] == 7:
+        return True 
 
-    # Read the file and process the data
-    with open(file_path, 'r') as file:
-        for line in file:
-            line = line.strip()
-            if line.startswith('Actions.'):
-                actions.append(line.split('.')[1])
-            else:
-                observations.append(list(map(float, line.split())))
-    return actions, observations
+def distance(pos1, pos2):
+    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-key_to_action = {
-    "forward": Actions.forward,
-    "left": Actions.left,
-    "right": Actions.right,
-    "toggle": Actions.toggle,
-    "pickup": Actions.pickup,
-    "drop": Actions.drop,
-    "done": Actions.done,
-}
+def give_progress(state, next_state):
+    global lava_cnt
+    goal = [8, 8]
+    progress = 0
+    if next_state == goal:
+        return 100 - 10 * lava_cnt
+    if next_state[3] == 1:
+        progress = 20
+    if next_state[4] == 1:
+        progress = 40
+    dis_progress =  (14 - distance(next_state, goal)) *(60/14)
+    progress += dis_progress
+    return progress - 10 * lava_cnt
+        
+
 
 def main():
+    global lava_cnt 
+    lava_cnt = 0
     env = SimpleEnv(render_mode="human")
     env = FlatObsWrapper(env)
+    env = NoDeath(env, no_death_types=("lava",), death_cost=-0.4)
     env.reset()
     progress = []
     delta_progress = [] 
     rewards = []
     file_name = "near_optimal_pose"
-    actions, obss = read_actions_from_file(file_name + ".txt")
+    states, actions, next_states = read_actions_from_file(file_name + ".txt")
+
+    auto = True
     env.render()
     time.sleep(3)
-    for action in actions:
-        print(action, key_to_action[action])
-        obs,reward, done, _, _ = env.step(action=key_to_action[action])
-        env.render()
-        time.sleep(0.5) 
-        # get progress via keyboard input
-        inp = (input("Enter progress: "))
-        if inp == '':
-            inp = 0
-        inp = int(inp)
-        
-        progress.append(int(inp))
-        #delta_progress.append(progress[-1] - progress[len(progress) - 2])
-        rewards.append(reward)
-        with open(file = file_name + "annotated" + ".txt", mode= "w") as f:
-            for i in range (len(progress)):
-                for i in obss[i]:
-                    f.write(str(i) + " ")
-                f.write("\n")
-                f.write(str(actions[i]) + "\n")
-                f.write(str(rewards[i]) + "\n")
-                f.write(str(progress[i]) + "\n")
-                #f.write(str(delta_progress[i]) + "\n")
-        f.close()
-        if done:
-            env.reset()
-        
-    print(progress)
-    print(delta_progress)
+    if auto:
+        for action in actions:
+            obs,reward, done, _, _ = env.step(action)
+            env.render()
+            #time.sleep(0.5) 
+            if reward == -0.4:
+                lava_cnt += 1
+            progress.append(give_progress(states[len(progress)], next_states[len(progress)]))
+            rewards.append(reward)
+            with open(file = file_name + "_auto_annotated" + ".txt", mode= "w") as f:
+                for i in range(len(progress)):
+                    for pos in states[i]:
+                        f.write(str(pos) + " ")
+                    f.write("\n")
+                    f.write(str(actions[i]) + "\n")
+                    for pos in next_states[i]:
+                        f.write(str(pos) + " ")
+                    f.write("\n")
+                    f.write(str(rewards[i]) + "\n")
+                    f.write(str(progress[i]) + "\n")
+                f.close()
+
+            if done:
+                lava_cnt = 0
+                env.reset()
+            
+    else:
+        for action in actions:
+            print(action)
+            obs,reward, done, _, _ = env.step(action)
+            env.render()
+            time.sleep(0.5) 
+            # get progress via keyboard input
+            inp = (input("Enter progress: "))
+            if inp == '':
+                inp = 0
+            inp = int(inp)
+            
+            progress.append(int(inp))
+            #delta_progress.append(progress[-1] - progress[len(progress) - 2])
+            rewards.append(reward)
+            with open(file = file_name + "_annotated" + ".txt", mode= "w") as f:
+                for i in range(len(progress)):
+                    for pos in states[i]:
+                        f.write(str(pos) + " ")
+                    f.write("\n")
+                    f.write(str(actions[i]) + "\n")
+                    for pos in next_states[i]:
+                        f.write(str(pos) + " ")
+                    f.write("\n")
+                    f.write(str(rewards[i]) + "\n")
+                    f.write(str(progress[i]) + "\n")
+                f.close()
+
+            if done:
+                env.reset()
+            
+        print(progress)
+        print(delta_progress)
 
 
     # print(actions)
